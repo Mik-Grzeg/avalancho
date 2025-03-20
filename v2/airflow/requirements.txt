@@ -1,0 +1,5 @@
+duckdb
+boto3
+pandas
+beautifulsoup4
+requests
