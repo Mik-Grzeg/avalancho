@@ -10,8 +10,8 @@ from etl_utils.topr.store_in_s3 import store_in_minio
 from etl_utils.topr.transform import parse_html, load_to_duckdb
 
 MINIO_ENDPOINT_URL = "http://minio:9000"
-MINIO_ACCESS_KEY   = "SnZ6Byr2Q5yfNp9bEL6C"
-MINIO_SECRET_KEY   = "yJIAS2NpoARC99u3WwHMv00LjlJKX7l2e3ypxACc"
+MINIO_ACCESS_KEY   = "gUSR094pmiRTpvI0tQXh"
+MINIO_SECRET_KEY   = "c4MBP9HahdTIUPIRfTPKFI15Pl4XaPwEXaI0wqZ2"
 MINIO_BUCKET       = "avalanche-lake"
 DUCKDB_FILE        = "/opt/airflow/warehouse/avalanche_reports.duckdb"
 

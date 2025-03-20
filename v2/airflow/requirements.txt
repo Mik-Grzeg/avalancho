@@ -1,4 +1,4 @@
-duckdb
+duckdb==1.2.1
 boto3
 pandas
 beautifulsoup4
