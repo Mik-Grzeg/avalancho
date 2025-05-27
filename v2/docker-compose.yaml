@@ -3,14 +3,28 @@ services:
     image: quay.io/minio/minio:latest
     container_name: minio
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: Secret123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-Secret123}
     volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
+      - ./data/raw:/data-export
+    command: server /data --console-address ":9001" 
     ports:
       - "9000:9000"   # S3-compatible API
       - "9001:9001"   # MinIO console
 
-volumes:
-  minio_data:
+  mc:
+    image: quay.io/minio/minio:latest
+    container_name: mc
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-Secret123}
+      ACCESS_KEY: ${ACCESS_KEY}
+      SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      - ./data/raw:/data-export
+    entrypoint: sh -c "sleep 3 && \
+      mc alias set local http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD \
+      && mc admin user svcacct add local admin --access-key $ACCESS_KEY --secret-key $SECRET_KEY \
+      && mc mb local/avalanche-lake"
+    depends_on:
+      - minio

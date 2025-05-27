@@ -4,12 +4,16 @@ import datetime
 import boto3
 import base64
 
-def store_in_minio(html_str: str, pdf_encoded: str,
-                   minio_endpoint: str,
-                   minio_access_key: str,
-                   minio_secret_key: str,
-                   bucket_name: str
-                   ) -> dict:
+
+def store_in_minio(
+    html_str: str,
+    pdf_encoded: str,
+    issued_at: str,
+    minio_endpoint: str,
+    minio_access_key: str,
+    minio_secret_key: str,
+    bucket_name: str,
+) -> dict:
     """
     Store raw HTML and PDF in MinIO, using a date-partitioned path.
     Args:
@@ -27,18 +31,20 @@ def store_in_minio(html_str: str, pdf_encoded: str,
         "s3",
         endpoint_url=minio_endpoint,
         aws_access_key_id=minio_access_key,
-        aws_secret_access_key=minio_secret_key
+        aws_secret_access_key=minio_secret_key,
     )
 
-    today = datetime.date.today()
-    partition_prefix = f"raw/topr/{today.year}/{today.month:02d}/{today.day:02d}"
+    issued_at = datetime.datetime.strptime(issued_at, "%Y-%m-%d %H:%M")
+    partition_prefix = (
+        f"raw/topr/{issued_at.year}/{issued_at.month:02d}/{issued_at.day:02d}"
+    )
 
     html_key = f"{partition_prefix}/report.html"
     s3_client.put_object(
         Bucket=bucket_name,
         Key=html_key,
         Body=html_str.encode("utf-8"),
-        ContentType="text/html"
+        ContentType="text/html",
     )
 
     pdf_key = None
@@ -49,7 +55,7 @@ def store_in_minio(html_str: str, pdf_encoded: str,
             Bucket=bucket_name,
             Key=pdf_key,
             Body=pdf_bytes,
-            ContentType="application/pdf"
+            ContentType="application/pdf",
         )
 
     return {"html_key": html_key, "pdf_key": pdf_key}

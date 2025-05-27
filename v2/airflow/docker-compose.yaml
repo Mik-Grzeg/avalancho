@@ -55,8 +55,8 @@ x-airflow-common:
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres-airflow/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
@@ -79,17 +79,19 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ./data/:/opt/airflow/warehouse/
     - ./avalanche_reporter/dags/topr_avalanche_dag.py:/opt/airflow/dags/topr_avalanche_dag.py
+    - ./avalanche_reporter/dags/migrate_duckdb_to_sqlite_dag.py:/opt/airflow/dags/migrate_duckdb_to_sqlite_dag.py
     - ./avalanche_reporter/etl_utils:/opt/airflow/dags/etl_utils
+    - ./avalanche_reporter/shared:/opt/airflow/dags/shared  # Mount shared models directory
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
     redis:
       condition: service_healthy
-    postgres:
+    postgres-airflow:
       condition: service_healthy
 
 services:
-  postgres:
+  postgres-airflow:
     image: postgres:13
     environment:
       POSTGRES_USER: airflow
@@ -287,6 +289,24 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  api:
+    build: 
+      context: ./avalanche_reporter
+      dockerfile: api/Dockerfile
+    container_name: avalanche_api
+    ports:
+      - "8000:8000"
+    environment:
+      MINIO_ENDPOINT: "http://minio:9000"
+      MINIO_ACCESS_KEY: ${ACCESS_KEY}
+      MINIO_SECRET_KEY: ${SECRET_KEY}
+      MINIO_BUCKET: "avalanche-lake"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - minio
+
 volumes:
   postgres-db-volume:
   duckdb-data-volume:
+
