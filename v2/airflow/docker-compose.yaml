@@ -289,22 +289,22 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  api:
-    build: 
-      context: ./avalanche_reporter
-      dockerfile: api/Dockerfile
-    container_name: avalanche_api
-    ports:
-      - "8000:8000"
-    environment:
-      MINIO_ENDPOINT: "http://minio:9000"
-      MINIO_ACCESS_KEY: ${ACCESS_KEY}
-      MINIO_SECRET_KEY: ${SECRET_KEY}
-      MINIO_BUCKET: "avalanche-lake"
-    volumes:
-      - ./data:/app/data
-    depends_on:
-      - minio
+  # api:
+  #   build: 
+  #     context: ./avalanche_reporter
+  #     dockerfile: api/Dockerfile
+  #   container_name: avalanche_api
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     MINIO_ENDPOINT: "http://minio:9000"
+  #     MINIO_ACCESS_KEY: ${ACCESS_KEY}
+  #     MINIO_SECRET_KEY: ${SECRET_KEY}
+  #     MINIO_BUCKET: "avalanche-lake"
+  #   volumes:
+  #     - ./data:/app/data
+  #   depends_on:
+  #     - minio
 
 volumes:
   postgres-db-volume:
