@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    networks:
+      - avalanche-network
+
+  backend:
+    build:
+      context: ./avalanche_reporter/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/avalanche_reports.db}
+      # Storage configuration (interchangeable)
+      - STORAGE_TYPE=${STORAGE_TYPE:-minio}
+      - ACCESS_KEY=${ACCESS_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - BUCKET_NAME=${BUCKET_NAME:-avalanche-lake}
+      # MinIO specific
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://minio:9000}
+      # AWS S3 specific
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      # Cloudflare R2 specific
+      - R2_ENDPOINT=${R2_ENDPOINT}
+      # Security
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - SECRET_KEY=${SECRET_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - avalanche-network
+    depends_on:
+      - minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-Secret123}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3-compatible API
+      - "9001:9001"   # MinIO console
+    restart: unless-stopped
+    networks:
+      - avalanche-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mc:
+    image: quay.io/minio/mc:latest
+    container_name: mc
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-Secret123}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+    volumes:
+      - ./data/raw:/data-export
+    entrypoint: sh -c "sleep 5 && \
+      mc alias set local http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD \
+      && mc admin user svcacct add local admin --access-key $MINIO_ACCESS_KEY --secret-key $MINIO_SECRET_KEY \
+      && mc mb local/avalanche-lake || true"
+    depends_on:
+      - minio
+    networks:
+      - avalanche-network
+
+networks:
+  avalanche-network:
+    driver: bridge
+
+volumes:
+  minio_data: 

@@ -1,0 +1,22 @@
+# OVH API Configuration (required)
+# Get these from: https://api.ovh.com/createToken/
+ovh_endpoint = "ovh-eu"  # ovh-eu, ovh-ca, ovh-us
+ovh_application_key = "your-ovh-application-key"
+ovh_application_secret = "your-ovh-application-secret"
+ovh_consumer_key = "your-ovh-consumer-key"
+
+# OVH Cloud Project ID (required)
+# Find this in your OVH Cloud console
+ovh_project_id = "your-ovh-project-id"
+
+# SSH configuration
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+ssh_user = "ubuntu"
+
+# Instance configuration
+flavor_id = "s1-2"      # 2GB RAM, 20GB SSD - €3.50/month
+image_id = "your-ubuntu-22-04-image-id"  # Get from OVH console
+region = "WAW1"         # Warsaw, Poland (for Polish users)
+
+# Domain configuration
+domain_name = "your-domain.com" 

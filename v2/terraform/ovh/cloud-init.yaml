@@ -1,0 +1,151 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - wget
+  - git
+  - unzip
+  - software-properties-common
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - ufw
+  - unattended-upgrades
+
+users:
+  - name: avalanche
+    groups: [sudo, docker]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+# Install Docker
+runcmd:
+  # Install Docker
+  - curl -fsSL https://get.docker.com -o get-docker.sh
+  - sh get-docker.sh
+  - usermod -aG docker avalanche
+  
+  # Install Docker Compose
+  - curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  - chmod +x /usr/local/bin/docker-compose
+  
+  # Install Nginx
+  - apt install -y nginx certbot python3-certbot-nginx
+  
+  # Create application directory
+  - mkdir -p /opt/avalanche-reporter
+  - chown avalanche:avalanche /opt/avalanche-reporter
+  
+  # Clone repository (change this URL to your repository)
+  - cd /opt/avalanche-reporter
+  - git clone https://github.com/Mik-Grzeg/avalancho.git .
+  - chown -R avalanche:avalanche /opt/avalanche-reporter
+  
+  # Copy environment file
+  - cp env.example .env
+  - chown avalanche:avalanche .env
+  
+  # Configure firewall
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow ssh
+  - ufw allow 80
+  - ufw allow 443
+  - ufw allow 3000
+  - ufw allow 8000
+  - ufw --force enable
+  
+  # Set up automatic security updates
+  - dpkg-reconfigure -plow unattended-upgrades
+  
+  # Create systemd service
+  - |
+    cat > /etc/systemd/system/avalanche-reporter.service << 'EOF'
+    [Unit]
+    Description=Avalanche Reporter Application
+    Requires=docker.service
+    After=docker.service
+
+    [Service]
+    Type=oneshot
+    RemainAfterExit=yes
+    WorkingDirectory=/opt/avalanche-reporter
+    ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yaml -f airflow/docker-compose.yaml up -d
+    ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yaml -f airflow/docker-compose.yaml down
+    TimeoutStartSec=0
+    User=avalanche
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+  
+  # Create Nginx configuration
+  - |
+    cat > /etc/nginx/sites-available/avalanche-reporter << 'EOF'
+    server {
+        listen 80;
+        server_name ${domain_name} www.${domain_name};
+
+        # Frontend
+        location / {
+            proxy_pass http://localhost:3000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Backend API
+        location /api/ {
+            proxy_pass http://localhost:8000/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Health check
+        location /health {
+            proxy_pass http://localhost:8000/health;
+            access_log off;
+        }
+    }
+    EOF
+  
+  # Enable Nginx site
+  - ln -sf /etc/nginx/sites-available/avalanche-reporter /etc/nginx/sites-enabled/
+  - rm -f /etc/nginx/sites-enabled/default
+  - nginx -t
+  - systemctl reload nginx
+  
+  # Create log rotation
+  - |
+    cat > /etc/logrotate.d/avalanche-reporter << 'EOF'
+    /opt/avalanche-reporter/logs/*.log {
+        daily
+        missingok
+        rotate 7
+        compress
+        delaycompress
+        notifempty
+        create 644 avalanche avalanche
+    }
+    EOF
+  
+  # Create logs directory
+  - mkdir -p /opt/avalanche-reporter/logs
+  - chown avalanche:avalanche /opt/avalanche-reporter/logs
+
+  # Build and start the application
+  - cd /opt/avalanche-reporter
+  - docker-compose -f docker-compose.prod.yaml -f airflow/docker-compose.yaml build
+  - docker-compose -f docker-compose.prod.yaml -f airflow/docker-compose.yaml up -d
+  
+  # Enable and start the service for future reboots
+  - systemctl enable avalanche-reporter
+
+final_message: "Avalanche Reporter server setup completed on OVH. SSH to the server and deploy your application." 

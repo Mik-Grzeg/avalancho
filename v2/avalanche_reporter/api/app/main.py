@@ -17,3 +17,8 @@ app.add_middleware(
 )
 
 app.include_router(avalanche_router)
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    return {"status": "healthy", "service": "avalanche-api"}
